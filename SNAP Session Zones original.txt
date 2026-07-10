@@ -1,0 +1,947 @@
+//@version=6
+indicator("SNAP Session Zones + Reference Levels", "SNAP Zones + Ref Lvls", overlay=true, scale=scale.none, max_boxes_count=500, max_lines_count=500, max_labels_count=500)
+
+//====================================================
+// SNAP SESSION GEOMETRY ZONES WITH RIGHT-SIDE REFERENCE LEVELS
+// Enhanced with M0-M5, Daily Open, YDay, LWeek, ADR, PSY levels
+// Styled to match TradingView chart with short-medium line lengths
+//====================================================
+
+
+//----------------------------------------------------
+// Session Inputs
+//----------------------------------------------------
+gSessGeo = "SNAP Session Geometry Zones"
+
+showSessionZones = input.bool(true, "Show session geometry zones", group=gSessGeo)
+sessionZoneTz = input.string("America/New_York", "Session timezone", options=["America/New_York", "GMT+0", "GMT+1", "GMT-4", "GMT-5"], group=gSessGeo)
+
+showLondonZone = input.bool(true, "Show London zone", group=gSessGeo)
+londonSession = input.session("0400-0800", "London time", group=gSessGeo)
+
+showNewYorkZone = input.bool(true, "Show New York zone", group=gSessGeo)
+newYorkSession = input.session("1030-1200", "New York time", group=gSessGeo)
+
+showTokyoZone = input.bool(true, "Show Tokyo zone", group=gSessGeo)
+tokyoSession = input.session("2000-0000", "Tokyo time", group=gSessGeo)
+
+showSydneyZone = input.bool(true, "Show Sydney zone", group=gSessGeo)
+sydneySession = input.session("1000-0600", "Sydney time", group=gSessGeo)
+
+showEUZone = input.bool(true, "Show EU session", group=gSessGeo)
+euSession = input.session("0300-0400", "EU time", group=gSessGeo)
+
+showUSZone = input.bool(true, "Show US session (9:30-10:30)", group=gSessGeo)
+usSession = input.session("0930-1030", "US time", group=gSessGeo)
+
+showNewDayOpenZone = input.bool(true, "Show New Day Open", group=gSessGeo)
+newDayOpenSession = input.session("0000-0100", "New Day Open time", group=gSessGeo)
+newDayOpenExtendBars = input.int(10, "New Day Open extension candles right", minval=0, maxval=200, group=gSessGeo)
+newDayOpenTransparency = input.int(86, "New Day Open transparency", minval=70, maxval=98, group=gSessGeo)
+
+showNewDayOpenMidline = input.bool(true, "Show New Day Open 50% line", group=gSessGeo)
+newDayOpenMidlineWidth = input.int(2, "New Day Open 50% line width", minval=1, maxval=5, group=gSessGeo)
+newDayOpenMidlineStyle = input.string("Solid", "New Day Open 50% line style", options=["Solid", "Dashed", "Dotted"], group=gSessGeo)
+
+showNewDayOpenLevels = input.bool(false, "Show New Day Open 0 / 25 / 50 / 75 / 100 levels", group=gSessGeo)
+showNewDayOpenOpeningTools = input.bool(false, "Show New Day Open 15m tools", group=gSessGeo)
+
+sessionHistory = input.int(8, "Sessions to keep", minval=1, maxval=40, group=gSessGeo)
+zoneTransparency = input.int(88, "Session box transparency", minval=70, maxval=98, group=gSessGeo)
+
+openingRangeMinutes = input.int(15, "Opening range minutes", minval=1, maxval=60, group=gSessGeo)
+showOpeningRange = input.bool(true, "Show first 15-minute range box", group=gSessGeo)
+showSessionNames = input.bool(true, "Show session names", group=gSessGeo)
+showPriceLabels = input.bool(true, "Show 15-minute high / low prices", group=gSessGeo)
+
+showOpeningFilterLines = input.bool(true, "Show 15m high / low filter lines", group=gSessGeo)
+openingFilterLineBars = input.int(10, "15m filter line candles to right", minval=1, maxval=50, group=gSessGeo)
+openingFilterLineWidth = input.int(2, "15m filter line width", minval=1, maxval=5, group=gSessGeo)
+openingFilterStartMode = input.string("Opening Start", "Filter line starts from", options=["Opening Start", "Opening End"], group=gSessGeo)
+
+londonColour = input.color(color.rgb(70, 220, 255), "London colour", group=gSessGeo)
+newYorkColour = input.color(color.rgb(255, 145, 0), "New York colour", group=gSessGeo)
+tokyoColour = input.color(color.rgb(170, 100, 255), "Tokyo colour", group=gSessGeo)
+sydneyColour = input.color(color.rgb(0, 255, 0), "Sydney colour (Green)", group=gSessGeo)
+euColour = input.color(color.rgb(128, 128, 128), "EU colour (Grey)", group=gSessGeo)
+usColour = input.color(color.rgb(255, 0, 0), "US colour (Red)", group=gSessGeo)
+newDayOpenColour = input.color(color.rgb(0, 255, 90), "New Day Open bright green colour", group=gSessGeo)
+
+openBoxColour = input.color(color.orange, "First 15m range box colour", group=gSessGeo)
+openHighColour = input.color(color.red, "15m high line / price", group=gSessGeo)
+openLowColour = input.color(color.rgb(0, 150, 255), "15m low line / price", group=gSessGeo)
+
+
+//----------------------------------------------------
+// Right-Side Reference Levels Inputs
+//----------------------------------------------------
+gRefLvl = "Right-Side Reference Levels"
+
+showRefLevels = input.bool(true, "Show right-side reference levels", group=gRefLvl)
+refLevelLineWidth = input.int(1, "Reference line width", minval=1, maxval=3, group=gRefLvl)
+refLineExtendBars = input.int(40, "Reference line extend right (bars)", minval=10, maxval=200, group=gRefLvl)
+
+showM0M5Levels = input.bool(true, "Show M0/M1/M2/M3/M4/M5 levels", group=gRefLvl)
+mLevelColour = input.color(color.rgb(100, 100, 100), "M-level colour (Grey dotted)", group=gRefLvl)
+
+showDailyOpen = input.bool(true, "Show Daily Open", group=gRefLvl)
+dailyOpenColour = input.color(color.rgb(255, 215, 0), "Daily Open colour (Gold)", group=gRefLvl)
+
+showYdayLevels = input.bool(true, "Show Yesterday High/Low", group=gRefLvl)
+ydayHighColour = input.color(color.rgb(70, 220, 255), "Yesterday High colour (Cyan)", group=gRefLvl)
+ydayLowColour = input.color(color.rgb(100, 150, 255), "Yesterday Low colour (Blue)", group=gRefLvl)
+
+showLweekHigh = input.bool(true, "Show Last Week High/Low", group=gRefLvl)
+lweekHighColour = input.color(color.rgb(0, 255, 0), "Last Week High colour (Green)", group=gRefLvl)
+lweekLowColour = input.color(color.rgb(0, 200, 0), "Last Week Low colour (Green)", group=gRefLvl)
+
+showADR = input.bool(true, "Show Average Daily Range", group=gRefLvl)
+adrColour = input.color(color.rgb(255, 145, 0), "ADR colour (Orange)", group=gRefLvl)
+
+showPSYLevels = input.bool(true, "Show PSY Levels", group=gRefLvl)
+psyColour = input.color(color.rgb(200, 100, 255), "PSY colour (Purple)", group=gRefLvl)
+
+showNewDayOpenRef = input.bool(true, "Show New Day Open Reference", group=gRefLvl)
+newDayOpenRefColour = input.color(color.rgb(0, 255, 90), "New Day Open Ref colour", group=gRefLvl)
+
+
+//----------------------------------------------------
+// Light Grey Climax Session Inputs
+//----------------------------------------------------
+gClimax = "SNAP Light Grey Climax Session Zone"
+
+showClimaxSessionZones = input.bool(true, "Show light grey climax session zones", group=gClimax)
+climaxShowMode = input.string("5m / 15m / 1h", "Show climax zones on", options=["All", "5m / 15m / 1h", "15m / 1h"], group=gClimax)
+
+showSellingClimaxSession = input.bool(true, "Show Selling Climax Session", group=gClimax)
+showBuyingClimaxSession = input.bool(true, "Show Buying Climax Session", group=gClimax)
+
+climaxSessionExtendBars = input.int(10, "Climax session extension candles right", minval=0, maxval=200, group=gClimax)
+climaxSessionHistory = input.int(12, "Climax sessions to keep", minval=1, maxval=50, group=gClimax)
+
+climaxSessionColour = input.color(color.rgb(190, 190, 190), "Light grey climax session colour", group=gClimax)
+climaxSessionTransparency = input.int(82, "Light grey session transparency", minval=60, maxval=98, group=gClimax)
+
+climaxSessionBorderColour = input.color(color.white, "Climax session border colour", group=gClimax)
+climaxSessionMidlineColour = input.color(color.white, "Climax 50% midline colour", group=gClimax)
+climaxSessionMidlineWidth = input.int(1, "Climax 50% midline width", minval=1, maxval=5, group=gClimax)
+
+showClimaxSessionLabels = input.bool(true, "Show climax session labels", group=gClimax)
+
+climaxRsiLen = input.int(14, "RSI length", minval=2, maxval=100, group=gClimax)
+
+sellClimaxRsiLevel = input.float(20.0, "Selling Climax RSI below", minval=0.0, maxval=50.0, group=gClimax)
+sellClimaxStrongRsiLevel = input.float(10.0, "Strong Selling Climax RSI below", minval=0.0, maxval=50.0, group=gClimax)
+requireStrongSellRsi = input.bool(false, "Require RSI below 10 for Selling Climax", group=gClimax)
+
+buyClimaxRsiLevel = input.float(70.0, "Buying Climax RSI above", minval=50.0, maxval=100.0, group=gClimax)
+buyClimaxStrongRsiLevel = input.float(80.0, "Strong Buying Climax RSI above", minval=50.0, maxval=100.0, group=gClimax)
+requireStrongBuyRsi = input.bool(false, "Require RSI above 80 for Buying Climax", group=gClimax)
+
+climaxVolLen = input.int(20, "VSA volume average length", minval=1, maxval=200, group=gClimax)
+climaxVolMult = input.float(2.0, "VSA extreme volume multiplier", minval=0.1, maxval=10.0, step=0.1, group=gClimax)
+requireExtremeVolume = input.bool(true, "Require VSA extreme volume", group=gClimax)
+
+
+//----------------------------------------------------
+// Session Storage
+//----------------------------------------------------
+var box[] allSessionBoxes = array.new_box()
+var line[] allSessionLines = array.new_line()
+var label[] allSessionLabels = array.new_label()
+
+var bool[] wasActive = array.new_bool(7, false)
+var int[] startBars = array.new_int(7, na)
+var int[] startTimes = array.new_int(7, na)
+
+var float[] sessHighs = array.new_float(7, na)
+var float[] sessLows = array.new_float(7, na)
+
+var float[] openHighs = array.new_float(7, na)
+var float[] openLows = array.new_float(7, na)
+var int[] openEndBars = array.new_int(7, na)
+
+var box[] mainBoxes = array.new_box(7, na)
+var box[] openBoxes = array.new_box(7, na)
+
+var label[] nameLabels = array.new_label(7, na)
+var label[] openHighLabels = array.new_label(7, na)
+var label[] openLowLabels = array.new_label(7, na)
+
+var line[] level0Lines = array.new_line(7, na)
+var line[] level25Lines = array.new_line(7, na)
+var line[] level50Lines = array.new_line(7, na)
+var line[] level75Lines = array.new_line(7, na)
+var line[] level100Lines = array.new_line(7, na)
+
+var line[] mid50Lines = array.new_line(7, na)
+
+var line[] openHighFilterLines = array.new_line(7, na)
+var line[] openLowFilterLines = array.new_line(7, na)
+
+
+//----------------------------------------------------
+// Reference Levels Storage
+//----------------------------------------------------
+var line mLevel0Line = na
+var line mLevel1Line = na
+var line mLevel2Line = na
+var line mLevel3Line = na
+var line mLevel4Line = na
+var line mLevel5Line = na
+
+var label mLevel0Label = na
+var label mLevel1Label = na
+var label mLevel2Label = na
+var label mLevel3Label = na
+var label mLevel4Label = na
+var label mLevel5Label = na
+
+var line dailyOpenLine = na
+var label dailyOpenLabel = na
+
+var line ydayHighLine = na
+var label ydayHighLabel = na
+
+var line ydayLowLine = na
+var label ydayLowLabel = na
+
+var line lweekHighLine = na
+var label lweekHighLabel = na
+
+var line lweekLowLine = na
+var label lweekLowLabel = na
+
+var line adrHighLine = na
+var line adrLowLine = na
+var label adrHighLabel = na
+var label adrLowLabel = na
+
+var line psyLevel1Line = na
+var line psyLevel2Line = na
+var line psyLevel3Line = na
+var label psyLevel1Label = na
+var label psyLevel2Label = na
+var label psyLevel3Label = na
+
+var line newDayOpenRefLine = na
+var label newDayOpenRefLabel = na
+
+var float dailyOpenValue = na
+var float ydayHighValue = na
+var float ydayLowValue = na
+var float lweekHighValue = na
+var float lweekLowValue = na
+var float newDayOpenRefValue = na
+
+
+//----------------------------------------------------
+// Climax Session Storage
+//----------------------------------------------------
+var box[] climaxSessionBoxes = array.new_box()
+var line[] climaxSessionMidlines = array.new_line()
+var label[] climaxSessionLabels = array.new_label()
+
+var box sellingClimaxSessionBox = na
+var line sellingClimaxSessionMidline = na
+var label sellingClimaxSessionLabel = na
+var float sellingClimaxSessionHigh = na
+var float sellingClimaxSessionLow = na
+var int sellingClimaxSessionStartBar = na
+
+var box buyingClimaxSessionBox = na
+var line buyingClimaxSessionMidline = na
+var label buyingClimaxSessionLabel = na
+var float buyingClimaxSessionHigh = na
+var float buyingClimaxSessionLow = na
+var int buyingClimaxSessionStartBar = na
+
+
+//----------------------------------------------------
+// General Helpers
+//----------------------------------------------------
+f_price(_price) =>
+    str.tostring(_price, format.mintick)
+
+f_line_style(_style) =>
+    _style == "Dashed" ? line.style_dashed : _style == "Dotted" ? line.style_dotted : line.style_solid
+
+f_keep_box(_box) =>
+    if not na(_box)
+        array.push(allSessionBoxes, _box)
+        while array.size(allSessionBoxes) > sessionHistory * 7 * 4
+            oldBox = array.shift(allSessionBoxes)
+            box.delete(oldBox)
+
+f_keep_line(_line) =>
+    if not na(_line)
+        array.push(allSessionLines, _line)
+        while array.size(allSessionLines) > sessionHistory * 7 * 8
+            oldLine = array.shift(allSessionLines)
+            line.delete(oldLine)
+
+f_keep_label(_label) =>
+    if not na(_label)
+        array.push(allSessionLabels, _label)
+        while array.size(allSessionLabels) > sessionHistory * 7 * 3
+            oldLabel = array.shift(allSessionLabels)
+            label.delete(oldLabel)
+
+f_set_line(_line, _x1, _x2, _price, _colour, _width) =>
+    if not na(_line) and not na(_price) and not na(_x1) and not na(_x2)
+        line.set_x1(_line, _x1)
+        line.set_x2(_line, _x2)
+        line.set_y1(_line, _price)
+        line.set_y2(_line, _price)
+        line.set_color(_line, _colour)
+        line.set_width(_line, _width)
+        line.set_extend(_line, extend.none)
+
+f_set_ref_line_short(_line, _x1, _x2, _price, _colour, _width, _label_obj, _label_text, _style) =>
+    if not na(_line) and not na(_price)
+        line.set_x1(_line, _x1)
+        line.set_x2(_line, _x2)
+        line.set_y1(_line, _price)
+        line.set_y2(_line, _price)
+        line.set_color(_line, _colour)
+        line.set_width(_line, _width)
+        line.set_style(_line, _style)
+        line.set_extend(_line, extend.none)
+    
+    if showRefLevels and not na(_label_obj) and not na(_price)
+        label.set_x(_label_obj, _x2)
+        label.set_y(_label_obj, _price)
+        label.set_text(_label_obj, _label_text)
+
+
+//----------------------------------------------------
+// Climax Helpers
+//----------------------------------------------------
+f_keep_climax_session_box(_box) =>
+    if not na(_box)
+        array.push(climaxSessionBoxes, _box)
+        while array.size(climaxSessionBoxes) > climaxSessionHistory
+            oldBox = array.shift(climaxSessionBoxes)
+            box.delete(oldBox)
+
+f_keep_climax_session_line(_line) =>
+    if not na(_line)
+        array.push(climaxSessionMidlines, _line)
+        while array.size(climaxSessionMidlines) > climaxSessionHistory
+            oldLine = array.shift(climaxSessionMidlines)
+            line.delete(oldLine)
+
+f_keep_climax_session_label(_label) =>
+    if not na(_label)
+        array.push(climaxSessionLabels, _label)
+        while array.size(climaxSessionLabels) > climaxSessionHistory
+            oldLabel = array.shift(climaxSessionLabels)
+            label.delete(oldLabel)
+
+f_update_climax_session(_box, _midline, _label, _leftBar, _rightBar, _top, _bottom, _name) =>
+    topPrice = math.max(_top, _bottom)
+    bottomPrice = math.min(_top, _bottom)
+    midPrice = math.avg(topPrice, bottomPrice)
+
+    if not na(_box)
+        box.set_left(_box, _leftBar)
+        box.set_right(_box, _rightBar)
+        box.set_top(_box, topPrice)
+        box.set_bottom(_box, bottomPrice)
+
+    if not na(_midline)
+        line.set_x1(_midline, _leftBar)
+        line.set_x2(_midline, _rightBar)
+        line.set_y1(_midline, midPrice)
+        line.set_y2(_midline, midPrice)
+        line.set_color(_midline, climaxSessionMidlineColour)
+        line.set_width(_midline, climaxSessionMidlineWidth)
+        line.set_style(_midline, line.style_dotted)
+        line.set_extend(_midline, extend.none)
+
+    if showClimaxSessionLabels and not na(_label)
+        label.set_x(_label, _leftBar)
+        label.set_y(_label, topPrice)
+        label.set_text(_label, _name)
+
+
+//----------------------------------------------------
+// Reference Levels Calculation
+//----------------------------------------------------
+f_calcDailyOpen() =>
+    if ta.change(time("D")) != 0
+        open
+    else
+        na
+
+f_calcYdayHigh() =>
+    if ta.change(time("D")) != 0
+        high[1]
+    else
+        na
+
+f_calcYdayLow() =>
+    if ta.change(time("D")) != 0
+        low[1]
+    else
+        na
+
+f_calcLweekHigh() =>
+    if ta.change(time("W")) != 0
+        high[1]
+    else
+        na
+
+f_calcLweekLow() =>
+    if ta.change(time("W")) != 0
+        low[1]
+    else
+        na
+
+f_calcADR() =>
+    adrLen = 14
+    avgRange = ta.sma(high - low, adrLen)
+    avgRange
+
+f_calcPSYLevels(_recent_high, _recent_low) =>
+    mid = math.avg(_recent_high, _recent_low)
+    quarter1 = _recent_low + (_recent_high - _recent_low) * 0.25
+    quarter3 = _recent_low + (_recent_high - _recent_low) * 0.75
+    [quarter1, mid, quarter3]
+
+f_calcMLevels(_sessionHigh, _sessionLow) =>
+    if na(_sessionHigh) or na(_sessionLow)
+        [na, na, na, na, na, na]
+    sessionRange = _sessionHigh - _sessionLow
+    m0 = _sessionLow
+    m1 = _sessionLow + sessionRange * (1/6)
+    m2 = _sessionLow + sessionRange * (2/6)
+    m3 = _sessionLow + sessionRange * (3/6)
+    m4 = _sessionLow + sessionRange * (4/6)
+    m5 = _sessionLow + sessionRange * (5/6)
+    [m0, m1, m2, m3, m4, m5]
+
+
+//----------------------------------------------------
+// Session Drawing Engine
+//----------------------------------------------------
+f_manage_session(_idx, _enabled, _session, _name, _colour, _transparency, _extendRightBars, _showLevels, _showOpeningTools, _showMid50, _mid50Width, _mid50Style) =>
+    active = showSessionZones and _enabled and not na(time(timeframe.period, _session, sessionZoneTz))
+    priorActive = array.get(wasActive, _idx)
+
+    started = active and not priorActive
+    ended = not active and priorActive
+
+    startBar = array.get(startBars, _idx)
+    startTime = array.get(startTimes, _idx)
+
+    sessHigh = array.get(sessHighs, _idx)
+    sessLow = array.get(sessLows, _idx)
+
+    opHigh = array.get(openHighs, _idx)
+    opLow = array.get(openLows, _idx)
+    opEndBar = array.get(openEndBars, _idx)
+
+    mainBox = array.get(mainBoxes, _idx)
+    opBox = array.get(openBoxes, _idx)
+
+    nameLabel = array.get(nameLabels, _idx)
+    opHighLabel = array.get(openHighLabels, _idx)
+    opLowLabel = array.get(openLowLabels, _idx)
+
+    l0 = array.get(level0Lines, _idx)
+    l25 = array.get(level25Lines, _idx)
+    l50 = array.get(level50Lines, _idx)
+    l75 = array.get(level75Lines, _idx)
+    l100 = array.get(level100Lines, _idx)
+
+    mid50Line = array.get(mid50Lines, _idx)
+
+    opHighFilterLine = array.get(openHighFilterLines, _idx)
+    opLowFilterLine = array.get(openLowFilterLines, _idx)
+
+    if started
+        startBar := bar_index
+        startTime := time
+
+        sessHigh := high
+        sessLow := low
+
+        opHigh := high
+        opLow := low
+        opEndBar := bar_index
+
+        rightEdge = bar_index + _extendRightBars
+        mid50 = math.avg(sessHigh, sessLow)
+
+        mainBox := box.new(left=startBar, top=sessHigh, right=rightEdge, bottom=sessLow, xloc=xloc.bar_index, border_color=_colour, border_width=1, border_style=line.style_dotted, bgcolor=color.new(_colour, _transparency))
+
+        if _showLevels
+            l100 := line.new(startBar, sessHigh, rightEdge, sessHigh, xloc=xloc.bar_index, color=_colour, width=1)
+            l75 := line.new(startBar, sessHigh, rightEdge, sessHigh, xloc=xloc.bar_index, color=color.new(_colour, 15), width=1)
+            l50 := line.new(startBar, sessHigh, rightEdge, sessHigh, xloc=xloc.bar_index, color=_colour, width=2)
+            l25 := line.new(startBar, sessHigh, rightEdge, sessHigh, xloc=xloc.bar_index, color=color.new(_colour, 15), width=1)
+            l0 := line.new(startBar, sessLow, rightEdge, sessLow, xloc=xloc.bar_index, color=_colour, width=1)
+
+        if _showMid50
+            mid50Line := line.new(x1=startBar, y1=mid50, x2=rightEdge, y2=mid50, xloc=xloc.bar_index, extend=extend.none, color=_colour, width=_mid50Width, style=_mid50Style)
+
+        if showSessionNames
+            nameLabel := label.new(x=startBar, y=sessHigh, text=_name, xloc=xloc.bar_index, yloc=yloc.price, style=label.style_label_lower_left, color=color.new(color.black, 100), textcolor=_colour, size=size.small)
+
+        if _showOpeningTools and showOpeningRange
+            opBox := box.new(left=startBar, top=opHigh, right=bar_index, bottom=opLow, xloc=xloc.bar_index, border_color=openBoxColour, border_width=1, border_style=line.style_dotted, bgcolor=color.new(openBoxColour, 88))
+
+        if _showOpeningTools and showOpeningFilterLines
+            filterLeft = openingFilterStartMode == "Opening End" ? opEndBar : startBar
+            filterRight = opEndBar + openingFilterLineBars
+
+            opHighFilterLine := line.new(x1=filterLeft, y1=opHigh, x2=filterRight, y2=opHigh, xloc=xloc.bar_index, extend=extend.none, color=openHighColour, width=openingFilterLineWidth, style=line.style_solid)
+            opLowFilterLine := line.new(x1=filterLeft, y1=opLow, x2=filterRight, y2=opLow, xloc=xloc.bar_index, extend=extend.none, color=openLowColour, width=openingFilterLineWidth, style=line.style_solid)
+
+        if _showOpeningTools and showPriceLabels
+            opHighLabel := label.new(x=bar_index, y=opHigh, text="15m High\n" + f_price(opHigh), xloc=xloc.bar_index, yloc=yloc.price, style=label.style_label_left, color=color.new(openHighColour, 15), textcolor=color.white, size=size.tiny)
+            opLowLabel := label.new(x=bar_index, y=opLow, text="15m Low\n" + f_price(opLow), xloc=xloc.bar_index, yloc=yloc.price, style=label.style_label_left, color=color.new(openLowColour, 15), textcolor=color.white, size=size.tiny)
+
+        f_keep_box(mainBox)
+        f_keep_box(opBox)
+
+        f_keep_line(l100)
+        f_keep_line(l75)
+        f_keep_line(l50)
+        f_keep_line(l25)
+        f_keep_line(l0)
+        f_keep_line(mid50Line)
+        f_keep_line(opHighFilterLine)
+        f_keep_line(opLowFilterLine)
+
+        f_keep_label(nameLabel)
+        f_keep_label(opHighLabel)
+        f_keep_label(opLowLabel)
+
+    if active
+        sessHigh := math.max(nz(sessHigh, high), high)
+        sessLow := math.min(nz(sessLow, low), low)
+
+        rightEdge = bar_index + _extendRightBars
+
+        if not na(mainBox)
+            box.set_top(mainBox, sessHigh)
+            box.set_bottom(mainBox, sessLow)
+            box.set_right(mainBox, rightEdge)
+
+        sessionRange = sessHigh - sessLow
+        level100 = sessHigh
+        level75 = sessLow + sessionRange * 0.75
+        level50 = sessLow + sessionRange * 0.50
+        level25 = sessLow + sessionRange * 0.25
+        level0 = sessLow
+        mid50 = math.avg(sessHigh, sessLow)
+
+        if _showLevels
+            f_set_line(l100, startBar, rightEdge, level100, _colour, 1)
+            f_set_line(l75, startBar, rightEdge, level75, color.new(_colour, 15), 1)
+            f_set_line(l50, startBar, rightEdge, level50, _colour, 2)
+            f_set_line(l25, startBar, rightEdge, level25, color.new(_colour, 15), 1)
+            f_set_line(l0, startBar, rightEdge, level0, _colour, 1)
+
+        if _showMid50
+            f_set_line(mid50Line, startBar, rightEdge, mid50, _colour, _mid50Width)
+            if not na(mid50Line)
+                line.set_style(mid50Line, _mid50Style)
+
+        if showSessionNames and not na(nameLabel)
+            label.set_x(nameLabel, startBar)
+            label.set_y(nameLabel, sessHigh)
+            label.set_text(nameLabel, _name)
+
+        if _showOpeningTools
+            openingActive = not na(startTime) and time < startTime + openingRangeMinutes * 60 * 1000
+
+            if openingActive
+                opHigh := math.max(nz(opHigh, high), high)
+                opLow := math.min(nz(opLow, low), low)
+                opEndBar := bar_index
+
+            filterLeft = openingFilterStartMode == "Opening End" ? opEndBar : startBar
+            filterRight = opEndBar + openingFilterLineBars
+
+            if showOpeningRange and not na(opBox)
+                box.set_top(opBox, opHigh)
+                box.set_bottom(opBox, opLow)
+                box.set_right(opBox, opEndBar)
+
+            if showOpeningFilterLines
+                f_set_line(opHighFilterLine, filterLeft, filterRight, opHigh, openHighColour, openingFilterLineWidth)
+                f_set_line(opLowFilterLine, filterLeft, filterRight, opLow, openLowColour, openingFilterLineWidth)
+
+            if showPriceLabels
+                if not na(opHighLabel)
+                    label.set_x(opHighLabel, opEndBar)
+                    label.set_y(opHighLabel, opHigh)
+                    label.set_text(opHighLabel, "15m High\n" + f_price(opHigh))
+
+                if not na(opLowLabel)
+                    label.set_x(opLowLabel, opEndBar)
+                    label.set_y(opLowLabel, opLow)
+                    label.set_text(opLowLabel, "15m Low\n" + f_price(opLow))
+
+    if ended
+        finalBar = bar_index - 1
+        finalRightEdge = finalBar + _extendRightBars
+        mid50Final = math.avg(sessHigh, sessLow)
+
+        if not na(mainBox)
+            box.set_right(mainBox, finalRightEdge)
+
+        if _showLevels
+            if not na(l100)
+                line.set_x2(l100, finalRightEdge)
+            if not na(l75)
+                line.set_x2(l75, finalRightEdge)
+            if not na(l50)
+                line.set_x2(l50, finalRightEdge)
+            if not na(l25)
+                line.set_x2(l25, finalRightEdge)
+            if not na(l0)
+                line.set_x2(l0, finalRightEdge)
+
+        if _showMid50
+            f_set_line(mid50Line, startBar, finalRightEdge, mid50Final, _colour, _mid50Width)
+            if not na(mid50Line)
+                line.set_style(mid50Line, _mid50Style)
+
+        if _showOpeningTools
+            filterLeftFinal = openingFilterStartMode == "Opening End" ? opEndBar : startBar
+            filterRightFinal = opEndBar + openingFilterLineBars
+
+            if showOpeningRange and not na(opBox) and not na(opEndBar)
+                box.set_right(opBox, opEndBar)
+
+            if showOpeningFilterLines
+                f_set_line(opHighFilterLine, filterLeftFinal, filterRightFinal, opHigh, openHighColour, openingFilterLineWidth)
+                f_set_line(opLowFilterLine, filterLeftFinal, filterRightFinal, opLow, openLowColour, openingFilterLineWidth)
+
+    array.set(wasActive, _idx, active)
+    array.set(startBars, _idx, startBar)
+    array.set(startTimes, _idx, startTime)
+    array.set(sessHighs, _idx, sessHigh)
+    array.set(sessLows, _idx, sessLow)
+    array.set(openHighs, _idx, opHigh)
+    array.set(openLows, _idx, opLow)
+    array.set(openEndBars, _idx, opEndBar)
+    array.set(mainBoxes, _idx, mainBox)
+    array.set(openBoxes, _idx, opBox)
+    array.set(nameLabels, _idx, nameLabel)
+    array.set(openHighLabels, _idx, opHighLabel)
+    array.set(openLowLabels, _idx, opLowLabel)
+    array.set(level0Lines, _idx, l0)
+    array.set(level25Lines, _idx, l25)
+    array.set(level50Lines, _idx, l50)
+    array.set(level75Lines, _idx, l75)
+    array.set(level100Lines, _idx, l100)
+    array.set(mid50Lines, _idx, mid50Line)
+    array.set(openHighFilterLines, _idx, opHighFilterLine)
+    array.set(openLowFilterLines, _idx, opLowFilterLine)
+
+
+//----------------------------------------------------
+// Draw Normal Sessions (Original)
+//----------------------------------------------------
+f_manage_session(0, showLondonZone, londonSession, "London", londonColour, zoneTransparency, 0, true, true, false, 1, line.style_solid)
+f_manage_session(1, showNewYorkZone, newYorkSession, "New York", newYorkColour, zoneTransparency, 0, true, true, false, 1, line.style_solid)
+f_manage_session(2, showTokyoZone, tokyoSession, "Tokyo", tokyoColour, zoneTransparency, 0, true, true, false, 1, line.style_solid)
+
+//----------------------------------------------------
+// Draw New Sessions (Enhanced)
+//----------------------------------------------------
+f_manage_session(3, showSydneyZone, sydneySession, "Sydney", sydneyColour, zoneTransparency, 0, true, true, false, 1, line.style_solid)
+f_manage_session(4, showEUZone, euSession, "EU", euColour, zoneTransparency, 0, true, true, false, 1, line.style_solid)
+f_manage_session(5, showUSZone, usSession, "US 9:30-10:30", usColour, zoneTransparency, 0, true, true, false, 1, line.style_solid)
+
+//----------------------------------------------------
+// Draw New Day Open Session
+//----------------------------------------------------
+f_manage_session(6, showNewDayOpenZone, newDayOpenSession, "New Day Open", newDayOpenColour, newDayOpenTransparency, newDayOpenExtendBars, showNewDayOpenLevels, showNewDayOpenOpeningTools, showNewDayOpenMidline, newDayOpenMidlineWidth, f_line_style(newDayOpenMidlineStyle))
+
+
+//====================================================
+// RIGHT-SIDE REFERENCE LEVELS
+//====================================================
+
+// Calculate reference levels
+dailyOpenCalc = f_calcDailyOpen()
+if not na(dailyOpenCalc)
+    dailyOpenValue := dailyOpenCalc
+
+ydayHighCalc = f_calcYdayHigh()
+if not na(ydayHighCalc)
+    ydayHighValue := ydayHighCalc
+
+ydayLowCalc = f_calcYdayLow()
+if not na(ydayLowCalc)
+    ydayLowValue := ydayLowCalc
+
+lweekHighCalc = f_calcLweekHigh()
+if not na(lweekHighCalc)
+    lweekHighValue := lweekHighCalc
+
+lweekLowCalc = f_calcLweekLow()
+if not na(lweekLowCalc)
+    lweekLowValue := lweekLowCalc
+
+adrValue = f_calcADR()
+
+recentHigh = ta.highest(high, 20)
+recentLow = ta.lowest(low, 20)
+[psyLevel1, psyLevel2, psyLevel3] = f_calcPSYLevels(recentHigh, recentLow)
+
+// Get current session highs for M-levels
+currentNDOSession = time(timeframe.period, newDayOpenSession, sessionZoneTz)
+if not na(currentNDOSession) and na(newDayOpenRefValue)
+    newDayOpenRefValue := open
+
+[mLevel0, mLevel1, mLevel2, mLevel3, mLevel4, mLevel5] = f_calcMLevels(array.get(sessHighs, 6), array.get(sessLows, 6))
+
+// Short to medium line extend
+lineStartBar = bar_index
+lineEndBar = bar_index + refLineExtendBars
+
+// Create/Update M-Level Lines (Dotted, SHORT-MEDIUM LENGTH)
+if showRefLevels and showM0M5Levels
+    if na(mLevel0Line)
+        mLevel0Line := line.new(x1=lineStartBar, y1=mLevel0, x2=lineEndBar, y2=mLevel0, xloc=xloc.bar_index, color=mLevelColour, width=refLevelLineWidth, style=line.style_dotted, extend=extend.none)
+        mLevel0Label := label.new(x=lineEndBar, y=mLevel0, text="M0", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_label_right, color=color.new(color.black, 100), textcolor=mLevelColour, size=size.small)
+    else
+        f_set_ref_line_short(mLevel0Line, lineStartBar, lineEndBar, mLevel0, mLevelColour, refLevelLineWidth, mLevel0Label, "M0", line.style_dotted)
+
+    if na(mLevel1Line) and not na(mLevel1)
+        mLevel1Line := line.new(x1=lineStartBar, y1=mLevel1, x2=lineEndBar, y2=mLevel1, xloc=xloc.bar_index, color=mLevelColour, width=refLevelLineWidth, style=line.style_dotted, extend=extend.none)
+        mLevel1Label := label.new(x=lineEndBar, y=mLevel1, text="M1", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_label_right, color=color.new(color.black, 100), textcolor=mLevelColour, size=size.small)
+    else if not na(mLevel1Line)
+        f_set_ref_line_short(mLevel1Line, lineStartBar, lineEndBar, mLevel1, mLevelColour, refLevelLineWidth, mLevel1Label, "M1", line.style_dotted)
+
+    if na(mLevel2Line) and not na(mLevel2)
+        mLevel2Line := line.new(x1=lineStartBar, y1=mLevel2, x2=lineEndBar, y2=mLevel2, xloc=xloc.bar_index, color=mLevelColour, width=refLevelLineWidth, style=line.style_dotted, extend=extend.none)
+        mLevel2Label := label.new(x=lineEndBar, y=mLevel2, text="M2", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_label_right, color=color.new(color.black, 100), textcolor=mLevelColour, size=size.small)
+    else if not na(mLevel2Line)
+        f_set_ref_line_short(mLevel2Line, lineStartBar, lineEndBar, mLevel2, mLevelColour, refLevelLineWidth, mLevel2Label, "M2", line.style_dotted)
+
+    if na(mLevel3Line) and not na(mLevel3)
+        mLevel3Line := line.new(x1=lineStartBar, y1=mLevel3, x2=lineEndBar, y2=mLevel3, xloc=xloc.bar_index, color=mLevelColour, width=refLevelLineWidth, style=line.style_dotted, extend=extend.none)
+        mLevel3Label := label.new(x=lineEndBar, y=mLevel3, text="M3", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_label_right, color=color.new(color.black, 100), textcolor=mLevelColour, size=size.small)
+    else if not na(mLevel3Line)
+        f_set_ref_line_short(mLevel3Line, lineStartBar, lineEndBar, mLevel3, mLevelColour, refLevelLineWidth, mLevel3Label, "M3", line.style_dotted)
+
+    if na(mLevel4Line) and not na(mLevel4)
+        mLevel4Line := line.new(x1=lineStartBar, y1=mLevel4, x2=lineEndBar, y2=mLevel4, xloc=xloc.bar_index, color=mLevelColour, width=refLevelLineWidth, style=line.style_dotted, extend=extend.none)
+        mLevel4Label := label.new(x=lineEndBar, y=mLevel4, text="M4", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_label_right, color=color.new(color.black, 100), textcolor=mLevelColour, size=size.small)
+    else if not na(mLevel4Line)
+        f_set_ref_line_short(mLevel4Line, lineStartBar, lineEndBar, mLevel4, mLevelColour, refLevelLineWidth, mLevel4Label, "M4", line.style_dotted)
+
+    if na(mLevel5Line) and not na(mLevel5)
+        mLevel5Line := line.new(x1=lineStartBar, y1=mLevel5, x2=lineEndBar, y2=mLevel5, xloc=xloc.bar_index, color=mLevelColour, width=refLevelLineWidth, style=line.style_dotted, extend=extend.none)
+        mLevel5Label := label.new(x=lineEndBar, y=mLevel5, text="M5", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_label_right, color=color.new(color.black, 100), textcolor=mLevelColour, size=size.small)
+    else if not na(mLevel5Line)
+        f_set_ref_line_short(mLevel5Line, lineStartBar, lineEndBar, mLevel5, mLevelColour, refLevelLineWidth, mLevel5Label, "M5", line.style_dotted)
+
+// Daily Open Line (Solid, SHORT-MEDIUM LENGTH)
+if showRefLevels and showDailyOpen and not na(dailyOpenValue)
+    if na(dailyOpenLine)
+        dailyOpenLine := line.new(x1=lineStartBar, y1=dailyOpenValue, x2=lineEndBar, y2=dailyOpenValue, xloc=xloc.bar_index, color=dailyOpenColour, width=refLevelLineWidth, style=line.style_solid, extend=extend.none)
+        dailyOpenLabel := label.new(x=lineEndBar, y=dailyOpenValue, text="Daily Open", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_label_right, color=color.new(color.black, 100), textcolor=dailyOpenColour, size=size.small)
+    else
+        f_set_ref_line_short(dailyOpenLine, lineStartBar, lineEndBar, dailyOpenValue, dailyOpenColour, refLevelLineWidth, dailyOpenLabel, "Daily Open", line.style_solid)
+
+// Yesterday High Line (Solid, SHORT-MEDIUM LENGTH)
+if showRefLevels and showYdayLevels and not na(ydayHighValue)
+    if na(ydayHighLine)
+        ydayHighLine := line.new(x1=lineStartBar, y1=ydayHighValue, x2=lineEndBar, y2=ydayHighValue, xloc=xloc.bar_index, color=ydayHighColour, width=refLevelLineWidth, style=line.style_solid, extend=extend.none)
+        ydayHighLabel := label.new(x=lineEndBar, y=ydayHighValue, text="YDay Hi", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_label_right, color=color.new(color.black, 100), textcolor=ydayHighColour, size=size.small)
+    else
+        f_set_ref_line_short(ydayHighLine, lineStartBar, lineEndBar, ydayHighValue, ydayHighColour, refLevelLineWidth, ydayHighLabel, "YDay Hi", line.style_solid)
+
+// Yesterday Low Line (Solid, SHORT-MEDIUM LENGTH)
+if showRefLevels and showYdayLevels and not na(ydayLowValue)
+    if na(ydayLowLine)
+        ydayLowLine := line.new(x1=lineStartBar, y1=ydayLowValue, x2=lineEndBar, y2=ydayLowValue, xloc=xloc.bar_index, color=ydayLowColour, width=refLevelLineWidth, style=line.style_solid, extend=extend.none)
+        ydayLowLabel := label.new(x=lineEndBar, y=ydayLowValue, text="YDay Lo", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_label_right, color=color.new(color.black, 100), textcolor=ydayLowColour, size=size.small)
+    else
+        f_set_ref_line_short(ydayLowLine, lineStartBar, lineEndBar, ydayLowValue, ydayLowColour, refLevelLineWidth, ydayLowLabel, "YDay Lo", line.style_solid)
+
+// Last Week High Line (Solid, SHORT-MEDIUM LENGTH)
+if showRefLevels and showLweekHigh and not na(lweekHighValue)
+    if na(lweekHighLine)
+        lweekHighLine := line.new(x1=lineStartBar, y1=lweekHighValue, x2=lineEndBar, y2=lweekHighValue, xloc=xloc.bar_index, color=lweekHighColour, width=refLevelLineWidth, style=line.style_solid, extend=extend.none)
+        lweekHighLabel := label.new(x=lineEndBar, y=lweekHighValue, text="LWeek Hi", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_label_right, color=color.new(color.black, 100), textcolor=lweekHighColour, size=size.small)
+    else
+        f_set_ref_line_short(lweekHighLine, lineStartBar, lineEndBar, lweekHighValue, lweekHighColour, refLevelLineWidth, lweekHighLabel, "LWeek Hi", line.style_solid)
+
+// Last Week Low Line (Solid, SHORT-MEDIUM LENGTH)
+if showRefLevels and showLweekHigh and not na(lweekLowValue)
+    if na(lweekLowLine)
+        lweekLowLine := line.new(x1=lineStartBar, y1=lweekLowValue, x2=lineEndBar, y2=lweekLowValue, xloc=xloc.bar_index, color=lweekLowColour, width=refLevelLineWidth, style=line.style_solid, extend=extend.none)
+        lweekLowLabel := label.new(x=lineEndBar, y=lweekLowValue, text="LWeek Lo", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_label_right, color=color.new(color.black, 100), textcolor=lweekLowColour, size=size.small)
+    else
+        f_set_ref_line_short(lweekLowLine, lineStartBar, lineEndBar, lweekLowValue, lweekLowColour, refLevelLineWidth, lweekLowLabel, "LWeek Lo", line.style_solid)
+
+// ADR Lines (Solid, SHORT-MEDIUM LENGTH)
+if showRefLevels and showADR and not na(adrValue)
+    adrHigh = close + (adrValue / 2)
+    adrLow = close - (adrValue / 2)
+    
+    if na(adrHighLine)
+        adrHighLine := line.new(x1=lineStartBar, y1=adrHigh, x2=lineEndBar, y2=adrHigh, xloc=xloc.bar_index, color=adrColour, width=refLevelLineWidth, style=line.style_solid, extend=extend.none)
+        adrHighLabel := label.new(x=lineEndBar, y=adrHigh, text="ADR+", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_label_right, color=color.new(color.black, 100), textcolor=adrColour, size=size.small)
+    else
+        f_set_ref_line_short(adrHighLine, lineStartBar, lineEndBar, adrHigh, adrColour, refLevelLineWidth, adrHighLabel, "ADR+", line.style_solid)
+
+    if na(adrLowLine)
+        adrLowLine := line.new(x1=lineStartBar, y1=adrLow, x2=lineEndBar, y2=adrLow, xloc=xloc.bar_index, color=adrColour, width=refLevelLineWidth, style=line.style_solid, extend=extend.none)
+        adrLowLabel := label.new(x=lineEndBar, y=adrLow, text="ADR-", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_label_right, color=color.new(color.black, 100), textcolor=adrColour, size=size.small)
+    else
+        f_set_ref_line_short(adrLowLine, lineStartBar, lineEndBar, adrLow, adrColour, refLevelLineWidth, adrLowLabel, "ADR-", line.style_solid)
+
+// PSY Levels (Solid, SHORT-MEDIUM LENGTH)
+if showRefLevels and showPSYLevels
+    if na(psyLevel1Line) and not na(psyLevel1)
+        psyLevel1Line := line.new(x1=lineStartBar, y1=psyLevel1, x2=lineEndBar, y2=psyLevel1, xloc=xloc.bar_index, color=psyColour, width=refLevelLineWidth, style=line.style_solid, extend=extend.none)
+        psyLevel1Label := label.new(x=lineEndBar, y=psyLevel1, text="Psy-Hi", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_label_right, color=color.new(color.black, 100), textcolor=psyColour, size=size.small)
+    else if not na(psyLevel1Line)
+        f_set_ref_line_short(psyLevel1Line, lineStartBar, lineEndBar, psyLevel1, psyColour, refLevelLineWidth, psyLevel1Label, "Psy-Hi", line.style_solid)
+
+    if na(psyLevel2Line) and not na(psyLevel2)
+        psyLevel2Line := line.new(x1=lineStartBar, y1=psyLevel2, x2=lineEndBar, y2=psyLevel2, xloc=xloc.bar_index, color=psyColour, width=refLevelLineWidth, style=line.style_solid, extend=extend.none)
+        psyLevel2Label := label.new(x=lineEndBar, y=psyLevel2, text="Psy-Mid", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_label_right, color=color.new(color.black, 100), textcolor=psyColour, size=size.small)
+    else if not na(psyLevel2Line)
+        f_set_ref_line_short(psyLevel2Line, lineStartBar, lineEndBar, psyLevel2, psyColour, refLevelLineWidth, psyLevel2Label, "Psy-Mid", line.style_solid)
+
+    if na(psyLevel3Line) and not na(psyLevel3)
+        psyLevel3Line := line.new(x1=lineStartBar, y1=psyLevel3, x2=lineEndBar, y2=psyLevel3, xloc=xloc.bar_index, color=psyColour, width=refLevelLineWidth, style=line.style_solid, extend=extend.none)
+        psyLevel3Label := label.new(x=lineEndBar, y=psyLevel3, text="Psy-Lo", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_label_right, color=color.new(color.black, 100), textcolor=psyColour, size=size.small)
+    else if not na(psyLevel3Line)
+        f_set_ref_line_short(psyLevel3Line, lineStartBar, lineEndBar, psyLevel3, psyColour, refLevelLineWidth, psyLevel3Label, "Psy-Lo", line.style_solid)
+
+// New Day Open Reference (Solid, SHORT-MEDIUM LENGTH)
+if showRefLevels and showNewDayOpenRef and not na(newDayOpenRefValue)
+    if na(newDayOpenRefLine)
+        newDayOpenRefLine := line.new(x1=lineStartBar, y1=newDayOpenRefValue, x2=lineEndBar, y2=newDayOpenRefValue, xloc=xloc.bar_index, color=newDayOpenRefColour, width=refLevelLineWidth, style=line.style_solid, extend=extend.none)
+        newDayOpenRefLabel := label.new(x=lineEndBar, y=newDayOpenRefValue, text="NDO", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_label_right, color=color.new(color.black, 100), textcolor=newDayOpenRefColour, size=size.small)
+    else
+        f_set_ref_line_short(newDayOpenRefLine, lineStartBar, lineEndBar, newDayOpenRefValue, newDayOpenRefColour, refLevelLineWidth, newDayOpenRefLabel, "NDO", line.style_solid)
+
+
+//====================================================
+// LIGHT GREY CLIMAX SESSION ZONE LOGIC
+//====================================================
+
+//----------------------------------------------------
+// Climax Logic
+//----------------------------------------------------
+climaxShowOnCurrentTf = climaxShowMode == "All" ? true : climaxShowMode == "5m / 15m / 1h" ? timeframe.isminutes and (timeframe.multiplier == 5 or timeframe.multiplier == 15 or timeframe.multiplier == 60) : timeframe.isminutes and (timeframe.multiplier == 15 or timeframe.multiplier == 60)
+
+climaxRsiValue = ta.rsi(close, climaxRsiLen)
+
+climaxVolAverage = ta.sma(volume, climaxVolLen)
+climaxExtremeVolume = volume >= climaxVolAverage * climaxVolMult
+climaxVolOk = requireExtremeVolume ? climaxExtremeVolume : true
+
+climaxDownClose3 = close < open and close[1] < open[1] and close[2] < open[2]
+climaxUpClose3 = close > open and close[1] > open[1] and close[2] > open[2]
+
+sellingClimaxRsiOk = requireStrongSellRsi ? climaxRsiValue <= sellClimaxStrongRsiLevel : climaxRsiValue <= sellClimaxRsiLevel
+buyingClimaxRsiOk = requireStrongBuyRsi ? climaxRsiValue >= buyClimaxStrongRsiLevel : climaxRsiValue >= buyClimaxRsiLevel
+
+bodyHigh0 = math.max(open, close)
+bodyLow0 = math.min(open, close)
+
+bodyHigh1 = math.max(open[1], close[1])
+bodyLow1 = math.min(open[1], close[1])
+
+bodyHigh2 = math.max(open[2], close[2])
+bodyLow2 = math.min(open[2], close[2])
+
+climaxBodyZoneHigh = math.max(bodyHigh0, math.max(bodyHigh1, bodyHigh2))
+climaxBodyZoneLow = math.min(bodyLow0, math.min(bodyLow1, bodyLow2))
+
+sellingClimaxSessionActive = showClimaxSessionZones and showSellingClimaxSession and climaxShowOnCurrentTf and climaxDownClose3 and sellingClimaxRsiOk and climaxVolOk
+buyingClimaxSessionActive = showClimaxSessionZones and showBuyingClimaxSession and climaxShowOnCurrentTf and climaxUpClose3 and buyingClimaxRsiOk and climaxVolOk
+
+sellingClimaxSessionStarted = sellingClimaxSessionActive and sellingClimaxSessionActive[1] != true
+sellingClimaxSessionEnded = not sellingClimaxSessionActive and sellingClimaxSessionActive[1] == true
+
+buyingClimaxSessionStarted = buyingClimaxSessionActive and buyingClimaxSessionActive[1] != true
+buyingClimaxSessionEnded = not buyingClimaxSessionActive and buyingClimaxSessionActive[1] == true
+
+
+//----------------------------------------------------
+// Selling Climax Light Grey Session Zone
+//----------------------------------------------------
+if sellingClimaxSessionStarted
+    sellingClimaxSessionStartBar := bar_index - 2
+    sellingClimaxSessionHigh := climaxBodyZoneHigh
+    sellingClimaxSessionLow := climaxBodyZoneLow
+
+    sellingRightBar = bar_index + climaxSessionExtendBars
+    sellingMidPrice = math.avg(sellingClimaxSessionHigh, sellingClimaxSessionLow)
+
+    sellingClimaxSessionBox := box.new(left=sellingClimaxSessionStartBar, top=sellingClimaxSessionHigh, right=sellingRightBar, bottom=sellingClimaxSessionLow, xloc=xloc.bar_index, border_color=climaxSessionBorderColour, border_width=1, border_style=line.style_dotted, bgcolor=color.new(climaxSessionColour, climaxSessionTransparency))
+
+    sellingClimaxSessionMidline := line.new(x1=sellingClimaxSessionStartBar, y1=sellingMidPrice, x2=sellingRightBar, y2=sellingMidPrice, xloc=xloc.bar_index, extend=extend.none, color=climaxSessionMidlineColour, width=climaxSessionMidlineWidth, style=line.style_dotted)
+
+    sellingClimaxSessionLabel := showClimaxSessionLabels ? label.new(x=sellingClimaxSessionStartBar, y=sellingClimaxSessionHigh, text="Selling Climax Session", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_label_lower_left, color=color.new(color.black, 100), textcolor=color.white, size=size.tiny) : na
+
+    f_keep_climax_session_box(sellingClimaxSessionBox)
+    f_keep_climax_session_line(sellingClimaxSessionMidline)
+    f_keep_climax_session_label(sellingClimaxSessionLabel)
+
+if sellingClimaxSessionActive
+    sellingClimaxSessionHigh := math.max(nz(sellingClimaxSessionHigh, climaxBodyZoneHigh), climaxBodyZoneHigh)
+    sellingClimaxSessionLow := math.min(nz(sellingClimaxSessionLow, climaxBodyZoneLow), climaxBodyZoneLow)
+
+    sellingRightBar = bar_index + climaxSessionExtendBars
+    f_update_climax_session(sellingClimaxSessionBox, sellingClimaxSessionMidline, sellingClimaxSessionLabel, sellingClimaxSessionStartBar, sellingRightBar, sellingClimaxSessionHigh, sellingClimaxSessionLow, "Selling Climax Session")
+
+if sellingClimaxSessionEnded
+    sellingFinalRightBar = bar_index - 1 + climaxSessionExtendBars
+    f_update_climax_session(sellingClimaxSessionBox, sellingClimaxSessionMidline, sellingClimaxSessionLabel, sellingClimaxSessionStartBar, sellingFinalRightBar, sellingClimaxSessionHigh, sellingClimaxSessionLow, "Selling Climax Session")
+
+
+//----------------------------------------------------
+// Buying Climax Light Grey Session Zone
+//----------------------------------------------------
+if buyingClimaxSessionStarted
+    buyingClimaxSessionStartBar := bar_index - 2
+    buyingClimaxSessionHigh := climaxBodyZoneHigh
+    buyingClimaxSessionLow := climaxBodyZoneLow
+
+    buyingRightBar = bar_index + climaxSessionExtendBars
+    buyingMidPrice = math.avg(buyingClimaxSessionHigh, buyingClimaxSessionLow)
+
+    buyingClimaxSessionBox := box.new(left=buyingClimaxSessionStartBar, top=buyingClimaxSessionHigh, right=buyingRightBar, bottom=buyingClimaxSessionLow, xloc=xloc.bar_index, border_color=climaxSessionBorderColour, border_width=1, border_style=line.style_dotted, bgcolor=color.new(climaxSessionColour, climaxSessionTransparency))
+
+    buyingClimaxSessionMidline := line.new(x1=buyingClimaxSessionStartBar, y1=buyingMidPrice, x2=buyingRightBar, y2=buyingMidPrice, xloc=xloc.bar_index, extend=extend.none, color=climaxSessionMidlineColour, width=climaxSessionMidlineWidth, style=line.style_dotted)
+
+    buyingClimaxSessionLabel := showClimaxSessionLabels ? label.new(x=buyingClimaxSessionStartBar, y=buyingClimaxSessionHigh, text="Buying Climax Session", xloc=xloc.bar_index, yloc=yloc.price, style=label.style_label_lower_left, color=color.new(color.black, 100), textcolor=color.white, size=size.tiny) : na
+
+    f_keep_climax_session_box(buyingClimaxSessionBox)
+    f_keep_climax_session_line(buyingClimaxSessionMidline)
+    f_keep_climax_session_label(buyingClimaxSessionLabel)
+
+if buyingClimaxSessionActive
+    buyingClimaxSessionHigh := math.max(nz(buyingClimaxSessionHigh, climaxBodyZoneHigh), climaxBodyZoneHigh)
+    buyingClimaxSessionLow := math.min(nz(buyingClimaxSessionLow, climaxBodyZoneLow), climaxBodyZoneLow)
+
+    buyingRightBar = bar_index + climaxSessionExtendBars
+    f_update_climax_session(buyingClimaxSessionBox, buyingClimaxSessionMidline, buyingClimaxSessionLabel, buyingClimaxSessionStartBar, buyingRightBar, buyingClimaxSessionHigh, buyingClimaxSessionLow, "Buying Climax Session")
+
+if buyingClimaxSessionEnded
+    buyingFinalRightBar = bar_index - 1 + climaxSessionExtendBars
+    f_update_climax_session(buyingClimaxSessionBox, buyingClimaxSessionMidline, buyingClimaxSessionLabel, buyingClimaxSessionStartBar, buyingFinalRightBar, buyingClimaxSessionHigh, buyingClimaxSessionLow, "Buying Climax Session")
+
+
+//----------------------------------------------------
+// Alerts
+//----------------------------------------------------
+alertcondition(sellingClimaxSessionStarted, "SNAP Selling Climax Session", "SNAP Selling Climax Session detected.")
+alertcondition(buyingClimaxSessionStarted, "SNAP Buying Climax Session", "SNAP Buying Climax Session detected.")
