@@ -144,6 +144,17 @@ requireExtremeVolume = input.bool(true, "Require VSA extreme volume", group=gCli
 
 
 //----------------------------------------------------
+// Macro Intervals Inputs
+//----------------------------------------------------
+gMacro = "Macro Intervals"
+
+showMacroIntervals = input.bool(true, "Show macro intervals", group=gMacro)
+macroIntervalColour = input.color(color.rgb(0, 100, 255), "Macro interval colour (Blue)", group=gMacro)
+macroIntervalLineWidth = input.int(2, "Macro interval line width", minval=1, maxval=5, group=gMacro)
+macroIntervalExtendBars = input.int(20, "Macro interval extension candles right", minval=0, maxval=200, group=gMacro)
+
+
+//----------------------------------------------------
 // Session Storage
 //----------------------------------------------------
 var box[] allSessionBoxes = array.new_box()
@@ -258,6 +269,16 @@ var int buyingClimaxSessionStartBar = na
 
 
 //----------------------------------------------------
+// Macro Intervals Storage
+//----------------------------------------------------
+var line[] macroIntervalLines = array.new_line(4, na)
+var label[] macroIntervalLabels = array.new_label(4, na)
+var int[] macroIntervalBars = array.new_int(4, na)
+
+var int lastMacroIntervalBar = na
+
+
+//----------------------------------------------------
 // General Helpers
 //----------------------------------------------------
 f_price(_price) =>
@@ -363,6 +384,55 @@ f_update_climax_session(_box, _midline, _label, _leftBar, _rightBar, _top, _bott
         label.set_x(_label, _leftBar)
         label.set_y(_label, topPrice)
         label.set_text(_label, _name)
+
+
+//----------------------------------------------------
+// Macro Intervals Helpers
+//----------------------------------------------------
+f_manage_macro_intervals() =>
+    if showMacroIntervals
+        currentHour = hour
+        currentMinute = minute
+        
+        // Array of macro interval times and labels
+        macroHours = array.from(9, 10, 13, 14)
+        macroMinutes = array.from(50, 50, 50, 50)
+        macroLabels = array.from("9:50-10:10", "10:50-11:10", "1:50-2:10", "2:50-3:10")
+        
+        for i = 0 to 3
+            macroHour = array.get(macroHours, i)
+            macroMinute = array.get(macroMinutes, i)
+            macroLabel = array.get(macroLabels, i)
+            
+            if currentHour == macroHour and currentMinute == macroMinute
+                if lastMacroIntervalBar != bar_index
+                    lastMacroIntervalBar := bar_index
+                    
+                    // Get price range for vertical line
+                    priceRange = high - low
+                    yTop = high + priceRange * 0.5
+                    yBottom = low - priceRange * 0.5
+                    
+                    // Create vertical line with extend.both to go through entire visible range
+                    newLine = line.new(x1=bar_index, y1=yBottom, x2=bar_index, y2=yTop, 
+                                      xloc=xloc.bar_index, color=macroIntervalColour, width=macroIntervalLineWidth, 
+                                      style=line.style_solid, extend=extend.both)
+                    
+                    // Create label above the line
+                    newLabel = label.new(x=bar_index, y=yTop, text=macroLabel, xloc=xloc.bar_index, yloc=yloc.price, 
+                                        style=label.style_label_center, color=color.new(macroIntervalColour, 20), 
+                                        textcolor=color.white, size=size.small)
+                    
+                    array.push(macroIntervalLines, newLine)
+                    array.push(macroIntervalLabels, newLabel)
+                    
+                    // Clean up old lines to avoid exceeding max limits
+                    while array.size(macroIntervalLines) > 100
+                        oldLine = array.shift(macroIntervalLines)
+                        line.delete(oldLine)
+                    while array.size(macroIntervalLabels) > 100
+                        oldLabel = array.shift(macroIntervalLabels)
+                        label.delete(oldLabel)
 
 
 //----------------------------------------------------
@@ -663,6 +733,11 @@ f_manage_session(5, showUSZone, usSession, "US 9:30-10:30", usColour, zoneTransp
 // Draw New Day Open Session
 //----------------------------------------------------
 f_manage_session(6, showNewDayOpenZone, newDayOpenSession, "New Day Open", newDayOpenColour, newDayOpenTransparency, newDayOpenExtendBars, showNewDayOpenLevels, showNewDayOpenOpeningTools, showNewDayOpenMidline, newDayOpenMidlineWidth, f_line_style(newDayOpenMidlineStyle))
+
+//----------------------------------------------------
+// Draw Macro Intervals
+//----------------------------------------------------
+f_manage_macro_intervals()
 
 
 //====================================================
