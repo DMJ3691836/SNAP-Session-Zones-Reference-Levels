@@ -51,7 +51,7 @@ f_is_high_volume() =>
         true
 
 f_should_show_interval() =>
-    case filterMode
+    switch filterMode
         "US Market Hours" => f_is_market_hours()
         "Pre-Market" => f_is_premarket()
         "Post-Market" => f_is_postmarket()
