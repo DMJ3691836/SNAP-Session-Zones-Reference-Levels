@@ -1,0 +1,116 @@
+//@version=6
+indicator("SNAP Macro Intervals", "Macro Intervals", overlay=true)
+
+//====================================================
+// SNAP MACRO INTERVALS - STANDALONE
+// Vertical lines at key macro interval times with filter mode
+//====================================================
+
+//----------------------------------------------------
+// Macro Intervals Inputs
+//----------------------------------------------------
+gMacro = "Macro Intervals Settings"
+
+showMacroIntervals = input.bool(true, "Show macro intervals", group=gMacro)
+macroIntervalColour = input.color(color.rgb(0, 100, 255), "Macro interval colour (Blue)", group=gMacro)
+macroIntervalLineWidth = input.int(2, "Macro interval line width", minval=1, maxval=5, group=gMacro)
+macroIntervalExtendBars = input.int(20, "Macro interval extension candles right", minval=0, maxval=200, group=gMacro)
+
+//----------------------------------------------------
+// Filter Inputs
+//----------------------------------------------------
+gFilter = "Filter Settings"
+
+filterMode = input.string("All Times", "Show intervals on", options=["All Times", "US Market Hours", "Pre-Market", "Post-Market"], group=gFilter)
+requireHighVolume = input.bool(false, "Require above-average volume", group=gFilter)
+volumeMultiplier = input.float(1.5, "Volume multiplier (vs 20-bar avg)", minval=0.5, maxval=5.0, step=0.1, group=gFilter)
+
+//----------------------------------------------------
+// Storage
+//----------------------------------------------------
+var line[] macroIntervalLines = array.new_line()
+var label[] macroIntervalLabels = array.new_label()
+
+//----------------------------------------------------
+// Helpers
+//----------------------------------------------------
+f_is_market_hours() =>
+    hour >= 9 and hour < 16
+
+f_is_premarket() =>
+    hour >= 4 and hour < 9 and minute >= 30
+
+f_is_postmarket() =>
+    hour >= 16 or (hour >= 0 and hour < 4)
+
+f_is_high_volume() =>
+    if requireHighVolume
+        avgVol = ta.sma(volume, 20)
+        volume > avgVol * volumeMultiplier
+    else
+        true
+
+f_should_show_interval() =>
+    case filterMode
+        "US Market Hours" => f_is_market_hours()
+        "Pre-Market" => f_is_premarket()
+        "Post-Market" => f_is_postmarket()
+        => true  // "All Times"
+
+f_cleanup_old_intervals() =>
+    // Keep only last 50 intervals
+    while array.size(macroIntervalLines) > 50
+        oldLine = array.shift(macroIntervalLines)
+        line.delete(oldLine)
+    while array.size(macroIntervalLabels) > 50
+        oldLabel = array.shift(macroIntervalLabels)
+        label.delete(oldLabel)
+
+//----------------------------------------------------
+// Main Logic
+//----------------------------------------------------
+if showMacroIntervals
+    currentHour = hour
+    currentMinute = minute
+    
+    // Macro interval times: 9:50, 10:50, 13:50, 14:50
+    macroHours = array.from(9, 10, 13, 14)
+    macroMinutes = array.from(50, 50, 50, 50)
+    macroLabels = array.from("9:50", "10:50", "1:50", "2:50")
+    
+    for i = 0 to 3
+        macroHour = array.get(macroHours, i)
+        macroMinute = array.get(macroMinutes, i)
+        macroLabel = array.get(macroLabels, i)
+        
+        if currentHour == macroHour and currentMinute == macroMinute and f_should_show_interval() and f_is_high_volume()
+            // Create vertical line
+            newLine = line.new(
+                x1=bar_index, 
+                y1=low - (high - low), 
+                x2=bar_index, 
+                y2=high + (high - low),
+                xloc=xloc.bar_index, 
+                color=macroIntervalColour, 
+                width=macroIntervalLineWidth,
+                style=line.style_solid, 
+                extend=extend.both
+            )
+            
+            // Create label
+            newLabel = label.new(
+                x=bar_index + macroIntervalExtendBars, 
+                y=high + (high - low) * 0.5,
+                text=macroLabel,
+                xloc=xloc.bar_index, 
+                yloc=yloc.price,
+                style=label.style_label_center, 
+                color=color.new(macroIntervalColour, 20),
+                textcolor=color.white, 
+                size=size.small
+            )
+            
+            array.push(macroIntervalLines, newLine)
+            array.push(macroIntervalLabels, newLabel)
+            
+            f_cleanup_old_intervals()
