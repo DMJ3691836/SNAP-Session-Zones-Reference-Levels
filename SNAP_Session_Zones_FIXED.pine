@@ -487,3 +487,134 @@ f_calcMLevels(_sessionHigh, _sessionLow) =>
     m4 = _sessionLow + sessionRange * (4/6)
     m5 = _sessionLow + sessionRange * (5/6)
     [m0, m1, m2, m3, m4, m5]
+
+
+//====================================================
+// MAIN EXECUTION LOGIC
+//====================================================
+
+// Calculate Daily Reference Levels
+dailyOpenValue := f_calcDailyOpen()
+ydayHighValue := f_calcYdayHigh()
+ydayLowValue := f_calcYdayLow()
+lweekHighValue := f_calcLweekHigh()
+lweekLowValue := f_calcLweekLow()
+
+adrValue = f_calcADR()
+[psyQ1, psyMid, psyQ3] = f_calcPSYLevels(high, low)
+
+// Initialize reference lines if needed
+if na(mLevel0Line)
+    mLevel0Line := line.new(x1=bar_index, y1=0, x2=bar_index+1, y2=0, color=mLevelColour, width=refLevelLineWidth, style=line.style_dotted)
+    mLevel1Line := line.new(x1=bar_index, y1=0, x2=bar_index+1, y2=0, color=mLevelColour, width=refLevelLineWidth, style=line.style_dotted)
+    mLevel2Line := line.new(x1=bar_index, y1=0, x2=bar_index+1, y2=0, color=mLevelColour, width=refLevelLineWidth, style=line.style_dotted)
+    mLevel3Line := line.new(x1=bar_index, y1=0, x2=bar_index+1, y2=0, color=mLevelColour, width=refLevelLineWidth, style=line.style_dotted)
+    mLevel4Line := line.new(x1=bar_index, y1=0, x2=bar_index+1, y2=0, color=mLevelColour, width=refLevelLineWidth, style=line.style_dotted)
+    mLevel5Line := line.new(x1=bar_index, y1=0, x2=bar_index+1, y2=0, color=mLevelColour, width=refLevelLineWidth, style=line.style_dotted)
+    
+    mLevel0Label := label.new(x=bar_index, y=0, text="M0", color=color.new(mLevelColour, 60), textcolor=color.white, size=size.tiny)
+    mLevel1Label := label.new(x=bar_index, y=0, text="M1", color=color.new(mLevelColour, 60), textcolor=color.white, size=size.tiny)
+    mLevel2Label := label.new(x=bar_index, y=0, text="M2", color=color.new(mLevelColour, 60), textcolor=color.white, size=size.tiny)
+    mLevel3Label := label.new(x=bar_index, y=0, text="M3", color=color.new(mLevelColour, 60), textcolor=color.white, size=size.tiny)
+    mLevel4Label := label.new(x=bar_index, y=0, text="M4", color=color.new(mLevelColour, 60), textcolor=color.white, size=size.tiny)
+    mLevel5Label := label.new(x=bar_index, y=0, text="M5", color=color.new(mLevelColour, 60), textcolor=color.white, size=size.tiny)
+
+if na(dailyOpenLine)
+    dailyOpenLine := line.new(x1=bar_index, y1=0, x2=bar_index+1, y2=0, color=dailyOpenColour, width=refLevelLineWidth, style=line.style_solid)
+    dailyOpenLabel := label.new(x=bar_index, y=0, text="DO", color=color.new(dailyOpenColour, 60), textcolor=color.white, size=size.tiny)
+
+if na(ydayHighLine)
+    ydayHighLine := line.new(x1=bar_index, y1=0, x2=bar_index+1, y2=0, color=ydayHighColour, width=refLevelLineWidth, style=line.style_dotted)
+    ydayHighLabel := label.new(x=bar_index, y=0, text="YH", color=color.new(ydayHighColour, 60), textcolor=color.white, size=size.tiny)
+
+if na(ydayLowLine)
+    ydayLowLine := line.new(x1=bar_index, y1=0, x2=bar_index+1, y2=0, color=ydayLowColour, width=refLevelLineWidth, style=line.style_dotted)
+    ydayLowLabel := label.new(x=bar_index, y=0, text="YL", color=color.new(ydayLowColour, 60), textcolor=color.white, size=size.tiny)
+
+if na(lweekHighLine)
+    lweekHighLine := line.new(x1=bar_index, y1=0, x2=bar_index+1, y2=0, color=lweekHighColour, width=refLevelLineWidth, style=line.style_dotted)
+    lweekHighLabel := label.new(x=bar_index, y=0, text="LWH", color=color.new(lweekHighColour, 60), textcolor=color.white, size=size.tiny)
+
+if na(lweekLowLine)
+    lweekLowLine := line.new(x1=bar_index, y1=0, x2=bar_index+1, y2=0, color=lweekLowColour, width=refLevelLineWidth, style=line.style_dotted)
+    lweekLowLabel := label.new(x=bar_index, y=0, text="LWL", color=color.new(lweekLowColour, 60), textcolor=color.white, size=size.tiny)
+
+if na(adrHighLine)
+    adrHighLine := line.new(x1=bar_index, y1=0, x2=bar_index+1, y2=0, color=adrColour, width=refLevelLineWidth, style=line.style_solid)
+    adrHighLabel := label.new(x=bar_index, y=0, text="ADR+", color=color.new(adrColour, 60), textcolor=color.white, size=size.tiny)
+
+if na(adrLowLine)
+    adrLowLine := line.new(x1=bar_index, y1=0, x2=bar_index+1, y2=0, color=adrColour, width=refLevelLineWidth, style=line.style_solid)
+    adrLowLabel := label.new(x=bar_index, y=0, text="ADR-", color=color.new(adrColour, 60), textcolor=color.white, size=size.tiny)
+
+if na(psyLevel1Line)
+    psyLevel1Line := line.new(x1=bar_index, y1=0, x2=bar_index+1, y2=0, color=psyColour, width=refLevelLineWidth, style=line.style_dotted)
+    psyLevel1Label := label.new(x=bar_index, y=0, text="PSY25", color=color.new(psyColour, 60), textcolor=color.white, size=size.tiny)
+
+if na(psyLevel2Line)
+    psyLevel2Line := line.new(x1=bar_index, y1=0, x2=bar_index+1, y2=0, color=psyColour, width=refLevelLineWidth, style=line.style_dotted)
+    psyLevel2Label := label.new(x=bar_index, y=0, text="PSY50", color=color.new(psyColour, 60), textcolor=color.white, size=size.tiny)
+
+if na(psyLevel3Line)
+    psyLevel3Line := line.new(x1=bar_index, y1=0, x2=bar_index+1, y2=0, color=psyColour, width=refLevelLineWidth, style=line.style_dotted)
+    psyLevel3Label := label.new(x=bar_index, y=0, text="PSY75", color=color.new(psyColour, 60), textcolor=color.white, size=size.tiny)
+
+if na(newDayOpenRefLine)
+    newDayOpenRefLine := line.new(x1=bar_index, y1=0, x2=bar_index+1, y2=0, color=newDayOpenRefColour, width=refLevelLineWidth, style=line.style_solid)
+    newDayOpenRefLabel := label.new(x=bar_index, y=0, text="NDO", color=color.new(newDayOpenRefColour, 60), textcolor=color.white, size=size.tiny)
+
+// Update reference levels display
+rightBar = bar_index + refLineExtendBars
+
+if showRefLevels and showM0M5Levels
+    [m0, m1, m2, m3, m4, m5] = f_calcMLevels(high, low)
+    if not na(m0)
+        f_set_ref_line_short(mLevel0Line, bar_index, rightBar, m0, mLevelColour, refLevelLineWidth, mLevel0Label, "M0: " + f_price(m0), line.style_dotted)
+    if not na(m1)
+        f_set_ref_line_short(mLevel1Line, bar_index, rightBar, m1, mLevelColour, refLevelLineWidth, mLevel1Label, "M1: " + f_price(m1), line.style_dotted)
+    if not na(m2)
+        f_set_ref_line_short(mLevel2Line, bar_index, rightBar, m2, mLevelColour, refLevelLineWidth, mLevel2Label, "M2: " + f_price(m2), line.style_dotted)
+    if not na(m3)
+        f_set_ref_line_short(mLevel3Line, bar_index, rightBar, m3, mLevelColour, refLevelLineWidth, mLevel3Label, "M3: " + f_price(m3), line.style_dotted)
+    if not na(m4)
+        f_set_ref_line_short(mLevel4Line, bar_index, rightBar, m4, mLevelColour, refLevelLineWidth, mLevel4Label, "M4: " + f_price(m4), line.style_dotted)
+    if not na(m5)
+        f_set_ref_line_short(mLevel5Line, bar_index, rightBar, m5, mLevelColour, refLevelLineWidth, mLevel5Label, "M5: " + f_price(m5), line.style_dotted)
+
+if showRefLevels and showDailyOpen and not na(dailyOpenValue)
+    f_set_ref_line_short(dailyOpenLine, bar_index, rightBar, dailyOpenValue, dailyOpenColour, refLevelLineWidth, dailyOpenLabel, "DO: " + f_price(dailyOpenValue), line.style_solid)
+
+if showRefLevels and showYdayLevels and not na(ydayHighValue)
+    f_set_ref_line_short(ydayHighLine, bar_index, rightBar, ydayHighValue, ydayHighColour, refLevelLineWidth, ydayHighLabel, "YH: " + f_price(ydayHighValue), line.style_dotted)
+
+if showRefLevels and showYdayLevels and not na(ydayLowValue)
+    f_set_ref_line_short(ydayLowLine, bar_index, rightBar, ydayLowValue, ydayLowColour, refLevelLineWidth, ydayLowLabel, "YL: " + f_price(ydayLowValue), line.style_dotted)
+
+if showRefLevels and showLweekHigh and not na(lweekHighValue)
+    f_set_ref_line_short(lweekHighLine, bar_index, rightBar, lweekHighValue, lweekHighColour, refLevelLineWidth, lweekHighLabel, "LWH: " + f_price(lweekHighValue), line.style_dotted)
+
+if showRefLevels and showLweekHigh and not na(lweekLowValue)
+    f_set_ref_line_short(lweekLowLine, bar_index, rightBar, lweekLowValue, lweekLowColour, refLevelLineWidth, lweekLowLabel, "LWL: " + f_price(lweekLowValue), line.style_dotted)
+
+if showRefLevels and showADR and not na(adrValue)
+    adrHigh = close + adrValue * 0.5
+    adrLow = close - adrValue * 0.5
+    f_set_ref_line_short(adrHighLine, bar_index, rightBar, adrHigh, adrColour, refLevelLineWidth, adrHighLabel, "ADR+: " + f_price(adrHigh), line.style_solid)
+    f_set_ref_line_short(adrLowLine, bar_index, rightBar, adrLow, adrColour, refLevelLineWidth, adrLowLabel, "ADR-: " + f_price(adrLow), line.style_solid)
+
+if showRefLevels and showPSYLevels
+    if not na(psyQ1)
+        f_set_ref_line_short(psyLevel1Line, bar_index, rightBar, psyQ1, psyColour, refLevelLineWidth, psyLevel1Label, "PSY25: " + f_price(psyQ1), line.style_dotted)
+    if not na(psyMid)
+        f_set_ref_line_short(psyLevel2Line, bar_index, rightBar, psyMid, psyColour, refLevelLineWidth, psyLevel2Label, "PSY50: " + f_price(psyMid), line.style_dotted)
+    if not na(psyQ3)
+        f_set_ref_line_short(psyLevel3Line, bar_index, rightBar, psyQ3, psyColour, refLevelLineWidth, psyLevel3Label, "PSY75: " + f_price(psyQ3), line.style_dotted)
+
+// Macro intervals processing
+f_manage_macro_intervals()
+
+// Simple placeholder box to ensure indicator outputs something
+// This is a safety measure - comment out once full session logic is implemented
+if showSessionZones
+    placeholder = box.new(left=bar_index-1, top=high+0.001, right=bar_index, bottom=high, border_color=color.new(color.gray, 100), bgcolor=color.new(color.gray, 99))
+    f_keep_box(placeholder)
